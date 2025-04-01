@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOCX to PDF Converter</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 400px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed #fff;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .drop-zone:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .drop-zone.dragover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: #fff;
+            background: #2575fc;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background: #6a11cb;
+        }
+
+        #progress {
+            margin-top: 20px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0;
+            background: #fff;
+            transition: width 0.3s ease;
+        }
+
+        #output {
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        a {
+            color: #fff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Drag & Drop DOCX File to Convert to PDF</h2>
+        <div class="drop-zone" id="dropZone">
+            <p>Drag & Drop your file here or click to upload</p>
+            <input type="file" id="fileInput" accept=".docx">
+        </div>
+        <button id="uploadBtn">Convert to PDF</button>
+        <div id="progress">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progressBar = document.getElementById('progress-bar');
+        const output = document.getElementById('output');
+        let selectedFile = null;
+
+        // Drag-and-drop functionality
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            selectedFile = e.dataTransfer.files[0];
+            if (selectedFile) {
+                dropZone.innerHTML = `<p>File Selected: ${selectedFile.name}</p>`;
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            selectedFile = fileInput.files[0];
+            if (selectedFile) {
+                dropZone.innerHTML = `<p>File Selected: ${selectedFile.name}</p>`;
+            }
+        });
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                output.innerHTML = '<p>Please select a DOCX file to upload.</p>';
+                return;
+            }
+
+            progressBar.style.width = '0%';
+            output.innerHTML = '<p>Uploading file...</p>';
+
+            // Step 1: Get a presigned URL
+            const presignUrlResponse = await fetch('https://api.pdf.co/v1/file/upload/get-presigned-url?name=' + encodeURIComponent(selectedFile.name) + '&contenttype=application/vnd.openxmlformats-officedocument.wordprocessingml.document', {
+                method: 'GET',
+                headers: {
+                    'x-api-key': 'himalthapa346@gmail.com_pT8bKK0aIAsjygCcrRo1L4WF8SrVUNpALNIDz4joYuGCdlNX0wojBAhQShVpEIT5'
+                }
+            });
+
+            const presignUrlData = await presignUrlResponse.json();
+
+            if (!presignUrlData.presignedUrl || !presignUrlData.url) {
+                output.innerHTML = '<p>Error obtaining presigned URL.</p>';
+                return;
+            }
+
+            // Step 2: Upload the file
+            const uploadResponse = await fetch(presignUrlData.presignedUrl, {
+                method: 'PUT',
+                body: selectedFile,
+                headers: {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                }
+            });
+
+            if (!uploadResponse.ok) {
+                output.innerHTML = '<p>Error uploading file.</p>';
+                return;
+            }
+
+            progressBar.style.width = '50%';
+            output.innerHTML = '<p>Converting file...</p>';
+
+            // Step 3: Convert the file
+            const convertResponse = await fetch('https://api.pdf.co/v1/pdf/convert/from/doc', {
+                method: 'POST',
+                headers: {
+                    'x-api-key': 'himalthapa346@gmail.com_pT8bKK0aIAsjygCcrRo1L4WF8SrVUNpALNIDz4joYuGCdlNX0wojBAhQShVpEIT5',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: presignUrlData.url,
+                    name: selectedFile.name.replace('.docx', '.pdf')
+                })
+            });
+
+            const convertData = await convertResponse.json();
+
+            if (convertData.error) {
+                output.innerHTML = `<p>Error converting file: ${convertData.message}</p>`;
+                return;
+            }
+
+            progressBar.style.width = '100%';
+            output.innerHTML = `<p>Conversion successful! Download your PDF file <a href="${convertData.url}" target="_blank">here</a>.</p>`;
+        });
+    </script>
+</body>
+</html>
